@@ -200,14 +200,36 @@ def cpu_name() -> str:
     return platform.processor() or "unknown CPU"
 
 
-def op_rows(ops: list[dict], peak: float, bw: float) -> list[dict]:
-    """Add intensity, achieved, roof, % of roof and bound to measured op dicts."""
-    ridge = fl.ridge_point(peak, bw)
+def cache_resident_bytes(sweep: dict, cache_bw: float | None, frac: float = 0.9, arrays: int = 3) -> float:
+    """Largest working set (bytes) that the a+b bandwidth sweep shows still running at cache speed.
+
+    ``sweep`` maps per-array MiB -> GB/s for ``c = a + b`` (three arrays touched). A size counts as cache-
+    resident while its bandwidth is >= ``frac * cache_bw``; the working set is ``arrays x`` that size.
+    Returns 0 when there is no cache measurement.
+    """
+    if not cache_bw or not sweep:
+        return 0.0
+    ok = [int(mb) for mb, g in sweep.items() if g * 1e9 >= frac * cache_bw]
+    return float(arrays * max(ok) * 2**20) if ok else 0.0
+
+
+def op_rows(ops: list[dict], peak: float, bw: float, cache_bw: float | None = None,
+            cache_bytes: float = 0.0) -> list[dict]:
+    """Add intensity, achieved, roof, % of roof and bound to measured op dicts.
+
+    The memory ceiling for an op is ``cache_bw`` when its compulsory traffic fits in ``cache_bytes`` (the
+    working set stays cache-resident, as the bandwidth sweep measures), else DRAM ``bw``. Classifying a
+    cache-resident op against the DRAM slope overstates "% of roof" and calls ops memory-bound that are
+    compute-bound at the bandwidth they actually see. Without ``cache_bw`` this is the plain DRAM roofline.
+    """
     rows = []
     for o in ops:
+        in_cache = bool(cache_bw) and o["bytes"] <= cache_bytes
+        mem_bw = cache_bw if in_cache else bw
+        ridge = fl.ridge_point(peak, mem_bw)
         i = o["flops"] / o["bytes"]
         ach = o["flops"] / o["seconds"]
-        roof = fl.attainable(i, peak, bw)
+        roof = fl.attainable(i, peak, mem_bw)
         rows.append(
             {
                 **o,
@@ -215,6 +237,8 @@ def op_rows(ops: list[dict], peak: float, bw: float) -> list[dict]:
                 "achieved": ach,
                 "roof": roof,
                 "pct_roof": 100 * ach / roof,
+                "pct_dram_roof": 100 * ach / fl.attainable(i, peak, bw),
+                "mem_roof": "cache" if in_cache else "DRAM",
                 "bound": "memory" if i < ridge else "compute",
                 "roof_time": o["flops"] / roof,
             }
@@ -251,13 +275,15 @@ def write_report(res: dict, out_md: str = OUT_MD) -> str:
     bw = res["bandwidth"]["bytes_per_s"]
     cbw = res["bandwidth"].get("cache_bytes_per_s")
     ridge = fl.ridge_point(peak, bw)
+    cbytes = cache_resident_bytes(res["bandwidth"].get("sweep", {}), cbw)
+    cridge = fl.ridge_point(peak, cbw) if cbw else ridge
     reuse = res["regimes"]["reuse"]["scenarios"]
     fresh = res["regimes"]["fresh"]["scenarios"]
     default = res["regimes"]["default"]["scenarios"]
     budget = 7 * 60
 
-    rows = {k: op_rows(v["ops"], peak, bw) for k, v in reuse.items()}
-    frows = {k: op_rows(v["ops"], peak, bw) for k, v in fresh.items()}
+    rows = {k: op_rows(v["ops"], peak, bw, cbw, cbytes) for k, v in reuse.items()}
+    frows = {k: op_rows(v["ops"], peak, bw, cbw, cbytes) for k, v in fresh.items()}
     summ = {k: forward_summary(v) for k, v in rows.items()}
     fsumm = {k: forward_summary(v) for k, v in frows.items()}
     base = rows["base"]
@@ -291,7 +317,12 @@ def write_report(res: dict, out_md: str = OUT_MD) -> str:
       f"{cbw / 1e9:.0f} GB/s ({cbw / bw:.1f}x DRAM; dashed line in the plots), and bandwidth falls to the "
       "DRAM level once the working set passes ~200 MiB." if cbw else "")
     w(f"- **Ridge point = {peak / 1e9:.0f} / {bw / 1e9:.1f} = {ridge:.1f} FLOPs per byte.** An op needs more than "
-      f"~{ridge:.0f} FLOPs per byte moved to be compute-bound; below that, DRAM bandwidth caps it.\n")
+      f"~{ridge:.0f} FLOPs per byte moved to be compute-bound; below that, DRAM bandwidth caps it." + (
+      f" **For working sets up to {cbytes / 2**20:.0f} MiB** (the sweep's cache-speed range, x3 arrays for a+b) "
+      f"the memory ceiling is the cache bandwidth, so the ridge is **{peak / 1e9:.0f} / {cbw / 1e9:.0f} = "
+      f"{cridge:.1f} FLOPs per byte**. Every per-op working set of the base config is in that range, so the op "
+      f"table below classifies ops against the cache roof (DRAM-roof percentages are kept in their own "
+      f"column).\n" if cbytes else "\n"))
 
     w("## 2. FLOPs and bytes per op (formulas)\n")
     w("`B=32, T=128, C=n_embd=128, H=4, hd=C/H=32, L=4, M=B*T=4096`, fp32 (s=4 bytes). FLOPs count a "
@@ -323,8 +354,9 @@ def write_report(res: dict, out_md: str = OUT_MD) -> str:
     def op_table(rs, frs=None, title=None):
         if title:
             w(title)
-        hdr = "| op | shape | FLOPs | bytes | FLOP/B | achieved GFLOP/s | % of roof | bound | µs / call | × per fwd | share of fwd time |"
-        sep = "|---|---|---|---|---|---|---|---|---|---|---|"
+        hdr = ("| op | shape | FLOPs | bytes | FLOP/B | achieved GFLOP/s | memory roof | % of roof | % of DRAM roof "
+               "| bound | µs / call | × per fwd | share of fwd time |")
+        sep = "|---|---|---|---|---|---|---|---|---|---|---|---|---|"
         if frs:
             hdr += " fresh-pages µs (faults/call) |"
             sep += "---|"
@@ -334,7 +366,8 @@ def write_report(res: dict, out_md: str = OUT_MD) -> str:
         for r in rs:
             line = (
                 f"| {r['name']} | `{r['shape']}` | {_fmt_flops(r['flops'])} | {_fmt_bytes(r['bytes'])} | "
-                f"{r['intensity']:.2f} | {r['achieved'] / 1e9:.1f} | {r['pct_roof']:.0f}% | {r['bound']} | "
+                f"{r['intensity']:.2f} | {r['achieved'] / 1e9:.1f} | {r['mem_roof']} | {r['pct_roof']:.0f}% | "
+                f"{r['pct_dram_roof']:.0f}% | {r['bound']} | "
                 f"{r['seconds'] * 1e6:.0f} | {r['count']} | {100 * sm['time_share'][r['name']]:.1f}% |"
             )
             if frs:
@@ -346,8 +379,9 @@ def write_report(res: dict, out_md: str = OUT_MD) -> str:
     w("## 3. Measured ops at the SPEC config (vocab 512)\n")
     w("Each op is a standalone torch call at the exact forward shape (`F.linear`, `@`, `masked_fill`+`softmax`, "
       "`F.gelu`, `F.layer_norm`, `F.cross_entropy`), forward only, no grad, best of 5 repeats after warmup. "
-      "**% of roof** = achieved / min(peak, DRAM BW × intensity). **bound** compares the intensity with the "
-      f"ridge ({ridge:.1f}). Main columns use the *reuse* allocator regime (no page faults); the last column is "
+      "**% of roof** = achieved / min(peak, BW × intensity), where BW is the bandwidth of the memory level the "
+      f"op's working set lives in (**memory roof**: cache for ≤ {cbytes / 2**20:.0f} MiB, else DRAM). **bound** "
+      f"compares the intensity with that level's ridge (cache {cridge:.1f}, DRAM {ridge:.1f}). Main columns use the *reuse* allocator regime (no page faults); the last column is "
       "the same op when every output buffer is fresh memory from the OS (see §4, takeaway 2).\n")
     op_table(base, fbase)
     w("Vocabulary only changes the last two ops:\n")
@@ -415,19 +449,23 @@ def write_report(res: dict, out_md: str = OUT_MD) -> str:
       f"the forward time. The elementwise/reduction ops (LayerNorm, softmax, GELU, cross-entropy) do "
       f"{100 * fshare(ew):.1f}% of the FLOPs but take {100 * share(ew):.0f}% of the time. At 0.6-1.3 FLOP/B "
       f"they are capped at ~{bw * 1.3 / 1e9:.0f} GFLOP/s from DRAM (~{cbw * 1.3 / 1e9:.0f} from cache). "
-      f"LayerNorm and GELU are simple one-pass kernels and reach {pr('LayerNorm')} / {pr('GELU')} of the DRAM "
-      f"roof (their 4-16 MiB working sets sit in cache, so they can even exceed it). **softmax is the single most expensive "
+      f"Their 4-16 MiB working sets sit in cache, so the cache roof is the right ceiling: LayerNorm and GELU "
+      f"reach {pr('LayerNorm')} / {pr('GELU')} of it (against the DRAM roof they would look like "
+      f"{by['LayerNorm']['pct_dram_roof']:.0f}% / {by['GELU']['pct_dram_roof']:.0f}%, which overstates how "
+      f"close they are to the hardware limit). **softmax is the single most expensive "
       f"op in the forward** ({100 * sb['time_share']['softmax']:.0f}% of the time for "
       f"{100 * by['softmax']['flops'] * by['softmax']['count'] / sb['flops']:.1f}% of the FLOPs, "
       f"{pr('softmax')} of its roof). Cross-entropy reaches {pr('cross-ent V=512')}. Both are slow because eager "
       f"PyTorch makes several passes over the T×T or M×V tensor (masked_fill, then max, exp-sum and normalise "
-      f"inside softmax), and an `exp` costs ~10-20 instructions, not 1. Memory-bound ops (intensity < ridge): "
-      f"**{', '.join(mem_ops)}**. The per-head attention matmuls sit just below the ridge "
-      f"(hd = 32 ⇒ {by['QK^T']['intensity']:.1f} FLOP/B) and take {100 * share(att):.0f}% of the time. They beat "
-      f"the DRAM slope because their 8 MiB tensors stay in cache.\n")
+      f"inside softmax), and an `exp` costs ~10-20 instructions, not 1. Memory-bound ops (intensity below the "
+      f"ridge of their memory level): **{', '.join(mem_ops)}**. The per-head attention matmuls "
+      f"(hd = 32 ⇒ {by['QK^T']['intensity']:.1f} FLOP/B) are below the DRAM ridge ({ridge:.1f}) but above the "
+      f"cache ridge ({cridge:.1f}); their 12 MiB working sets stay in cache, so they are "
+      f"**{by['QK^T']['bound']}-bound** and run at {pr('QK^T')} (QK^T) / {pr('attn@V')} (attn@V) of the "
+      f"compute roof. They take {100 * share(att):.0f}% of the time.\n")
     fr_pen = fsb["seconds"] / sb["seconds"]
     rB_def, rB_reu = default["batch=128"]["step"][key_step], reuse["batch=128"]["step"][key_step]
-    w(f"2. **Page faults are a hidden, shape-dependent tax -- and the rest of the gap is overhead, not FLOPs.** "
+    w(f"2. **Page faults are a hidden, shape-dependent tax; the rest of the gap is only partly attributed.** "
       f"Every `[B,H,T,T]` fp32 tensor is {32 * 4 * 128 * 128 * 4 / 2**20:.0f} MiB. If glibc has returned such a "
       f"buffer to the OS, the next allocation is a fresh mmap and the kernel must zero-fill and map 2048 new "
       f"4 KiB pages. QK^T then costs {fbase['QK^T']['seconds'] * 1e6:.0f} µs instead of "
@@ -441,9 +479,15 @@ def write_report(res: dict, out_md: str = OUT_MD) -> str:
       f"hit glibc's 32 MiB ceiling for that adaptive threshold, so they stay mmapped and fault in every call. (Pinning `MALLOC_MMAP_THRESHOLD_` / "
       f"`MALLOC_TRIM_THRESHOLD_` in the environment is a free fix.) Overall the base step runs at "
       f"{100 * mfu:.0f}% of peak, and the roofline lower bound for fwd+bwd is ~{3 * sb['roof_seconds'] * 1e3:.0f} ms "
-      f"vs {st_def[key_step] * 1e3:.0f} ms measured. The gap is memory-bound elementwise work run as separate "
-      f"unfused passes, per-call thread/dispatch overhead on ~0.1-2 ms kernels, and autograd bookkeeping -- not "
-      f"a shortage of FLOP/s. All four runs share the same shapes except V, so this affects them about "
+      f"vs {st_def[key_step] * 1e3:.0f} ms measured. What is measured about that gap: of the summed forward op "
+      f"time, Linear layers take {100 * share(lin):.0f}%, attention matmuls {100 * share(att):.0f}% and "
+      f"elementwise ops {100 * share(ew):.0f}%; and the replica forward ({st_reu['forward'] * 1e3:.1f} ms, reuse) "
+      f"is {100 * (st_reu['forward'] / sb['seconds'] - 1):.0f}% longer than the sum of its profiled ops "
+      f"({sb['seconds'] * 1e3:.1f} ms) -- time in unprofiled work (residual adds, transposes/contiguous copies, "
+      f"embedding gather) and per-call dispatch. The backward pass and AdamW were not profiled per op, so how "
+      f"the remaining ~{100 * (1 - st_reu['forward'] / st_reu[key_step]):.0f}% of the step splits is not "
+      f"measured here. The matmuls still take the largest share of the forward; elementwise ops take a share "
+      f"far above their FLOPs. All four runs share the same shapes except V, so this affects them about "
       f"equally.\n")
 
     # scenario takeaway (recomputed, not guessed)
@@ -541,8 +585,9 @@ def make_plots(res: dict) -> tuple[str, str]:
     cbw = res["bandwidth"].get("cache_bytes_per_s")
     reuse = res["regimes"]["reuse"]["scenarios"]
     fresh = res["regimes"]["fresh"]["scenarios"]
-    rows = {k: op_rows(v["ops"], peak, bw) for k, v in reuse.items()}
-    frows = {k: op_rows(v["ops"], peak, bw) for k, v in fresh.items()}
+    cbytes = cache_resident_bytes(res["bandwidth"].get("sweep", {}), cbw)
+    rows = {k: op_rows(v["ops"], peak, bw, cbw, cbytes) for k, v in reuse.items()}
+    frows = {k: op_rows(v["ops"], peak, bw, cbw, cbytes) for k, v in fresh.items()}
     # Main plot: base ops (V=512) + LM head / CE for the other vocabularies.
     main_rows = list(rows["base"])
     main_frows = list(frows["base"])

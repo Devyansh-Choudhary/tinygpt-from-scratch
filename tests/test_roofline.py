@@ -255,3 +255,34 @@ def test_report_and_plots_from_fake_results(tmp_path, monkeypatch):
     rows = {r["name"]: r for r in rrun.op_rows(res["regimes"]["reuse"]["scenarios"]["base"]["ops"], 600e9, 50e9)}
     assert rows["softmax"]["bound"] == "memory" and rows["MLP up"]["bound"] == "compute"
     assert rows["MLP up"]["pct_roof"] == pytest.approx(100 * 400 / 600)
+
+
+def test_cache_resident_ops_are_classified_against_the_cache_roof():
+    """Review fix: an op whose working set fits in cache must be judged against the cache bandwidth.
+    With peak 600 GFLOP/s, DRAM 50 GB/s (ridge 12) and cache 100 GB/s (ridge 6), a 12 MiB op at 10 FLOP/B
+    is compute-bound; the same intensity with a 200 MiB working set is DRAM/memory-bound."""
+    sweep = {1: 280.0, 4: 100.0, 16: 98.0, 64: 70.0, 256: 50.0}
+    cbytes = rrun.cache_resident_bytes(sweep, 100e9)
+    assert cbytes == 3 * 16 * 2**20  # 16 MiB arrays still at >= 90% of cache speed, a+b touches 3 arrays
+    assert rrun.cache_resident_bytes(sweep, None) == 0.0
+    small = {"name": "qk", "flops": 10 * 12 * 2**20, "bytes": 12 * 2**20, "seconds": 1e-3, "count": 1}
+    big = dict(small, name="big", flops=10 * 200 * 2**20, bytes=200 * 2**20)
+    ew = {"name": "gelu", "flops": 0.6 * 16 * 2**20, "bytes": 16 * 2**20, "seconds": 16 * 2**20 / 40e9, "count": 1}
+    r = {x["name"]: x for x in rrun.op_rows([small, big, ew], 600e9, 50e9, 100e9, cbytes)}
+    assert r["qk"]["mem_roof"] == "cache" and r["qk"]["bound"] == "compute"
+    assert r["big"]["mem_roof"] == "DRAM" and r["big"]["bound"] == "memory"
+    # 40 GB/s on a cache-resident elementwise op is 80% of the DRAM roof but only 40% of the real roof.
+    assert r["gelu"]["pct_dram_roof"] == pytest.approx(80) and r["gelu"]["pct_roof"] == pytest.approx(40)
+    # Without a cache measurement the classification is the plain DRAM roofline (old behaviour).
+    plain = {x["name"]: x for x in rrun.op_rows([small], 600e9, 50e9)}
+    assert plain["qk"]["bound"] == "memory" and plain["qk"]["mem_roof"] == "DRAM"
+
+
+def test_report_uses_cache_roof_and_does_not_claim_unmeasured_causes(tmp_path):
+    res = _fake_results()
+    res["bandwidth"]["sweep"] = {1: 280.0, 4: 100.0, 16: 98.0, 256: 50.0}
+    text = open(rrun.write_report(res, str(tmp_path / "R.md"))).read()
+    assert "| memory roof |" in text and "| cache |" in text
+    assert "= 6.0 FLOPs per byte" in text  # cache ridge 600 / 100
+    assert "not a shortage of FLOP/s" not in text and "overhead, not FLOPs" not in text
+    assert "were not profiled per op" in text
