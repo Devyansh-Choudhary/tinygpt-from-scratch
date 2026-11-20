@@ -1,0 +1,8 @@
+{
+  "_comment": "python -m tinygpt.train --run_config configs/bpe512.json",
+  "run_name": "bpe512",
+  "tokenizer": "bpe512",
+  "use_pos_emb": true,
+  "time_budget_min": 7,
+  "config": "configs/default.json"
+}
