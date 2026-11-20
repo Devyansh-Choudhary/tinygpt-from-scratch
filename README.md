@@ -74,7 +74,7 @@ python -m roofline.run
 ```
 
 Results depend on the machine: the budget is wall-clock, so a faster CPU does more steps. The committed
-numbers come from a 4-thread Intel Xeon @ 2.1 GHz cloud VM; see `RESULTS.md`.
+numbers come from a 4-thread Intel Xeon @ 2.3 GHz cloud VM (the original runs used a 2.1 GHz one); see `RESULTS.md`.
 
 ## Demo
 
