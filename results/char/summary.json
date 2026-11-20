@@ -1,0 +1,50 @@
+{
+  "run_name": "char",
+  "tokenizer": "char",
+  "vocab_size": 96,
+  "use_pos_emb": true,
+  "final_val_bpc": 1.2585168790706394,
+  "final_val_loss": 0.8643938511610031,
+  "final_train_loss": 0.8298954943889182,
+  "steps": 3958,
+  "train_time_s": 420.05132824299955,
+  "time_budget_s": 420.0,
+  "wall_time_s": 437.67263513699993,
+  "steps_per_sec": 9.42265797981312,
+  "tokens_per_sec": 38595.20708531454,
+  "tokenize_time_s": 0.012710823999981358,
+  "n_train_tokens": 4749852,
+  "n_val_tokens": 249873,
+  "chars_per_token_val": 1.0,
+  "num_params_non_embedding": 793344,
+  "num_params_total": 822016,
+  "checkpoint": "checkpoints/char.pt",
+  "hparams": {
+    "batch_size": 32,
+    "block_size": 128,
+    "n_layer": 4,
+    "n_head": 4,
+    "n_embd": 128,
+    "dropout": 0.0,
+    "lr": 0.003,
+    "betas": [
+      0.9,
+      0.95
+    ],
+    "weight_decay": 0.1,
+    "grad_clip": 1.0,
+    "warmup_frac": 0.05,
+    "min_lr_frac": 0.1,
+    "eval_interval_s": 30,
+    "eval_iters": 20,
+    "eval_max_chars_during_training": 50000,
+    "sample_prompt": "Once upon a time",
+    "sample_tokens": 200,
+    "sample_temperature": 0.8,
+    "sample_top_k": null,
+    "sample_fracs": [
+      0.25,
+      0.5
+    ]
+  }
+}

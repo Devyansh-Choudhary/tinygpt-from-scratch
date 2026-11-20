@@ -1,0 +1,2 @@
+step,elapsed_s,train_loss,val_loss,val_bpc
+0,0.00,6.26557,6.26536,3.87910
