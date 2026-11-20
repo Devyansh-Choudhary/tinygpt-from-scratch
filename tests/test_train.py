@@ -1,8 +1,8 @@
 """Tests for train + evaluate. Owner: Agent C. See SPEC.md §4.
 
 Fakes of other agents' modules (model, tokenizer, data split) live ONLY in this file and are
-monkeypatched into ``tinygpt.train`` / ``tinygpt.evaluate``, so these tests pass while those modules
-are still stubs. ``test_real_modules_*`` exercise the real ones and skip while they are stubs.
+monkeypatched into ``tinygpt.train`` / ``tinygpt.evaluate``, so the logic tests are independent of those
+modules. ``test_real_*`` and the CLI smoke test use the real model/tokenizers (skip if stubs).
 """
 
 from __future__ import annotations
@@ -431,53 +431,88 @@ def test_run_config_rejects_hyperparameters(tmp_path, fakes):
 
 
 # ------------------------------------------------------------------------------------------------
-# ~20 s smoke test of the full CLI path (fake model/tokenizer, real default config, 15 s budget)
+# real modules (model, tokenizers, data split from main); skip if any is still a stub
 # ------------------------------------------------------------------------------------------------
-def test_cli_smoke_20s(tmp_path, fakes, monkeypatch, capsys):
-    monkeypatch.setattr(tr, "load_corpus", lambda path=None: make_text(1_200_000, seed=1))
+REAL_TOKENIZER_DIR = os.path.join(REPO_ROOT, "data", "tokenizers")
+
+
+def _require_real_modules():
+    from tinygpt import data, model, tokenizer
+
+    try:
+        tok = tokenizer.CharTokenizer()
+        model.GPT(GPTConfig(vocab_size=tok.vocab_size, block_size=8, n_layer=1, n_head=1, n_embd=8))
+        data.split_text("a\nb\n")
+    except NotImplementedError:
+        pytest.skip("model/tokenizer/data still stubs")
+    return data
+
+
+@pytest.mark.parametrize("kind", ["char", "bpe512"])
+def test_real_modules_tiny_run(tmp_path, kind):
+    data = _require_real_modules()
+    text = make_text(30000)
+    out = tr.run_training("real", kind, max_steps=3, text=text, results_dir=str(tmp_path / "r"),
+                          checkpoint_dir=str(tmp_path / "c"), tokenizer_dir=REAL_TOKENIZER_DIR,
+                          config_path=tiny_config(tmp_path, n_layer=1, n_head=2, n_embd=16), cache_dir=None,
+                          verbose=False)
+    assert out["steps"] == 3 and math.isfinite(out["final_val_bpc"])
+    m2, tok2, ck = ev.load_checkpoint(str(tmp_path / "c" / "real.pt"))
+    assert tok2.name == kind and ck["model_config"]["vocab_size"] == tok2.vocab_size
+    assert m2.lm_head.weight.shape[0] == tok2.vocab_size and not m2.training
+    _, val = data.split_text(text)
+    # tiny_config trains with block_size=32; BPC must be recomputed with the same block size
+    assert ev.bits_per_char(m2, tok2, val, 32) == pytest.approx(out["final_val_bpc"], rel=1e-6)
+
+
+def test_real_untrained_model_bpc_near_uniform():
+    """An N(0, 0.02)-initialised GPT predicts ~uniformly: BPC ~= log2(V) * tokens / chars."""
+    _require_real_modules()
+    from tinygpt.model import GPT
+    from tinygpt.tokenizer import get_tokenizer
+
+    text = make_text(3000)
+    for kind in ("char", "bpe512"):
+        tok = get_tokenizer(kind, path=os.path.join(REAL_TOKENIZER_DIR, f"{kind}.json"))
+        torch.manual_seed(0)
+        model = GPT(GPTConfig(vocab_size=tok.vocab_size, block_size=64))
+        ids = tok.encode(text)
+        expected = (len(ids) - 1) * math.log2(tok.vocab_size) / (len(text) - len(tok.decode(ids[:1])))
+        assert ev.bits_per_char(model, tok, text, 64) == pytest.approx(expected, rel=0.03)
+
+
+# ------------------------------------------------------------------------------------------------
+# ~20 s smoke test of the full CLI path: REAL model + committed char tokenizer, default config with
+# eval made cheaper, 12 s training budget, synthetic corpus (tests must not need the real corpus).
+# ------------------------------------------------------------------------------------------------
+def test_cli_smoke_20s(tmp_path, monkeypatch, capsys):
+    _require_real_modules()
+    monkeypatch.setattr(tr, "load_corpus", lambda path=None: make_text(600_000, seed=1))
     hp = tr.load_hparams(DEFAULT_CONFIG)
-    hp["eval_interval_s"] = 4  # a few periodic evals within the 15 s budget
+    hp.update(eval_interval_s=4, eval_iters=4, eval_max_chars_during_training=8000, sample_tokens=50)
     cfg = tmp_path / "default.json"
     cfg.write_text(json.dumps(hp))
     run_cfg = tmp_path / "smoke.json"
     run_cfg.write_text(json.dumps({"run_name": "smoke", "tokenizer": "char", "use_pos_emb": True,
                                    "time_budget_min": 7, "config": str(cfg)}))
     monkeypatch.chdir(tmp_path)
-    tr.main(["--run_config", str(run_cfg), "--time_budget_min", "0.25", "--results_dir", "results",
-             "--checkpoint_dir", "checkpoints", "--tokenizer_dir", "tok"])
+    tr.main(["--run_config", str(run_cfg), "--time_budget_min", "0.2", "--results_dir", "results",
+             "--checkpoint_dir", "checkpoints", "--tokenizer_dir", REAL_TOKENIZER_DIR])
     printed = capsys.readouterr().out
     assert "steps/s" in printed and "not counted in budget" in printed
 
     rows = read_log(tmp_path / "results" / "smoke" / "log.csv")
-    assert len(rows) >= 1 + 1 + 3 + 1  # header, step 0, >=3 periodic, final
+    assert rows[0] == ["step", "elapsed_s", "train_loss", "val_loss", "val_bpc"]
+    assert len(rows) >= 1 + 1 + 2 + 1  # header, step 0, >=2 periodic, final
     elapsed = [float(r[1]) for r in rows[1:]]
-    assert elapsed == sorted(elapsed) and 15.0 <= elapsed[-1] < 16.0
+    assert elapsed == sorted(elapsed) and 12.0 <= elapsed[-1] < 14.0
     assert all(math.isfinite(float(v)) for r in rows[1:] for v in r[2:])
+    assert float(rows[1][3]) == pytest.approx(math.log(96), abs=0.3)  # untrained ~ uniform
+    assert float(rows[-1][3]) < float(rows[1][3]) - 1.0  # it learned something
     samples = (tmp_path / "results" / "smoke" / "samples.txt").read_text()
     assert len(re.findall(r"^=== step \d+ \(elapsed [\d.]+s\) ===$", samples, flags=re.M)) == 4
+    assert samples.count("Once upon a time") == 4
     model, tok, ck = ev.load_checkpoint(str(tmp_path / "checkpoints" / "smoke.pt"))
-    assert ck["model_config"]["block_size"] == 128 and ck["run_name"] == "smoke"
+    assert ck["model_config"]["block_size"] == 128 and ck["run_name"] == "smoke" and not model.training
     summary = json.loads((tmp_path / "results" / "smoke" / "summary.json").read_text())
     assert summary["steps"] > 10 and summary["final_val_bpc"] == ck["final_val_bpc"]
-
-
-# ------------------------------------------------------------------------------------------------
-# real modules (skip while other agents' modules are stubs)
-# ------------------------------------------------------------------------------------------------
-def test_real_modules_tiny_run(tmp_path):
-    from tinygpt import data, model, tokenizer
-
-    try:
-        tok = tokenizer.get_tokenizer("char", path=str(tmp_path / "tok" / "char.json"))
-        m = model.GPT(GPTConfig(vocab_size=tok.vocab_size, block_size=16, n_layer=1, n_head=2, n_embd=16))
-        data.split_text("a\nb\n")
-    except NotImplementedError:
-        pytest.skip("model/tokenizer/data still stubs")
-    out = tr.run_training("real", "char", max_steps=3, text=make_text(30000), results_dir=str(tmp_path / "r"),
-                          checkpoint_dir=str(tmp_path / "c"), tokenizer_dir=str(tmp_path / "tok"),
-                          config_path=tiny_config(tmp_path, n_layer=1, n_head=2, n_embd=16), cache_dir=None,
-                          verbose=False)
-    assert out["steps"] == 3 and math.isfinite(out["final_val_bpc"])
-    m2, tok2, _ = ev.load_checkpoint(str(tmp_path / "c" / "real.pt"))
-    _, val = data.split_text(make_text(30000))
-    assert ev.bits_per_char(m2, tok2, val, 16) == pytest.approx(out["final_val_bpc"], rel=1e-5)
