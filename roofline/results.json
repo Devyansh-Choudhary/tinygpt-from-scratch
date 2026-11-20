@@ -1,0 +1,1410 @@
+{
+ "machine": {
+  "cpu": "Intel(R) Xeon(R) Processor @ 2.10GHz",
+  "threads": 4,
+  "torch": "2.15.0+cpu"
+ },
+ "peak": {
+  "flops": 611233034602.9188,
+  "per_size": {
+   "1024": 611.2330346029188,
+   "2048": 564.2616932476575,
+   "3072": 611.2274844223742,
+   "4096": 551.457693947241
+  }
+ },
+ "bandwidth": {
+  "bytes_per_s": 41195325952.76414,
+  "per_kind": {
+   "copy": 40.43693325018389,
+   "add": 41.195325952764136
+  },
+  "n_bytes": 268435456,
+  "sweep": {
+   "1": 226.0106508977111,
+   "4": 92.13074426992613,
+   "16": 93.19923568509984,
+   "64": 65.22023174704933,
+   "256": 40.36160423586089,
+   "1024": 38.716798193707014
+  },
+  "cache_bytes_per_s": 93199235685.09984
+ },
+ "regimes": {
+  "reuse": {
+   "regime": "reuse",
+   "env": {
+    "MALLOC_MMAP_THRESHOLD_": "1073741824",
+    "MALLOC_TRIM_THRESHOLD_": "17179869184",
+    "MALLOC_TOP_PAD_": null
+   },
+   "scenarios": {
+    "base": {
+     "shape": {
+      "B": 32,
+      "T": 128,
+      "C": 128,
+      "H": 4,
+      "L": 4,
+      "V": 512
+     },
+     "ops": [
+      {
+       "name": "LayerNorm",
+       "kind": "elementwise",
+       "shape": "[4096,128]",
+       "flops": 3670016,
+       "bytes": 4195328,
+       "count": 9,
+       "seconds": 0.00012655283529404508,
+       "faults": 0.0
+      },
+      {
+       "name": "QKV proj",
+       "kind": "matmul",
+       "shape": "[4096,128]@[128,384]",
+       "flops": 404226048,
+       "bytes": 8586752,
+       "count": 4,
+       "seconds": 0.0010920355909072234,
+       "faults": 0.0
+      },
+      {
+       "name": "QK^T",
+       "kind": "attention",
+       "shape": "128x[128,32]@[32,128]",
+       "flops": 136314880,
+       "bytes": 12582912,
+       "count": 4,
+       "seconds": 0.000745442527272644,
+       "faults": 0.0
+      },
+      {
+       "name": "softmax",
+       "kind": "elementwise",
+       "shape": "[32,4,128,128]",
+       "flops": 10485760,
+       "bytes": 16793600,
+       "count": 4,
+       "seconds": 0.0019556285666681105,
+       "faults": 0.0
+      },
+      {
+       "name": "attn@V",
+       "kind": "attention",
+       "shape": "128x[128,128]@[128,32]",
+       "flops": 134217728,
+       "bytes": 12582912,
+       "count": 4,
+       "seconds": 0.0004128547394963002,
+       "faults": 0.0
+      },
+      {
+       "name": "out proj",
+       "kind": "matmul",
+       "shape": "[4096,128]@[128,128]",
+       "flops": 134742016,
+       "bytes": 4260352,
+       "count": 4,
+       "seconds": 0.00028810538709673784,
+       "faults": 0.0
+      },
+      {
+       "name": "MLP up",
+       "kind": "matmul",
+       "shape": "[4096,128]@[128,512]",
+       "flops": 538968064,
+       "bytes": 10749952,
+       "count": 4,
+       "seconds": 0.001571528387095837,
+       "faults": 0.0
+      },
+      {
+       "name": "GELU",
+       "kind": "elementwise",
+       "shape": "[4096,512]",
+       "flops": 10485760,
+       "bytes": 16777216,
+       "count": 4,
+       "seconds": 0.0004121106097561163,
+       "faults": 0.0
+      },
+      {
+       "name": "MLP down",
+       "kind": "matmul",
+       "shape": "[4096,512]@[512,128]",
+       "flops": 537395200,
+       "bytes": 10748416,
+       "count": 4,
+       "seconds": 0.0015312191379342917,
+       "faults": 0.0
+      },
+      {
+       "name": "LM head V=512",
+       "kind": "matmul",
+       "shape": "[4096,128]@[128,512]",
+       "flops": 536870912,
+       "bytes": 10747904,
+       "count": 1,
+       "seconds": 0.0013759397500021147,
+       "faults": 0.0
+      },
+      {
+       "name": "cross-ent V=512",
+       "kind": "elementwise",
+       "shape": "[4096,512]",
+       "flops": 10485760,
+       "bytes": 8421376,
+       "count": 1,
+       "seconds": 0.0007083088630149912,
+       "faults": 0.0
+      }
+     ],
+     "step": {
+      "forward": 0.04798329774999388,
+      "forward+backward": 0.13976680050001278,
+      "train step (fwd+bwd+AdamW)": 0.12509775499995612
+     }
+    },
+    "V=96": {
+     "shape": {
+      "B": 32,
+      "T": 128,
+      "C": 128,
+      "H": 4,
+      "L": 4,
+      "V": 96
+     },
+     "ops": [
+      {
+       "name": "LayerNorm",
+       "kind": "elementwise",
+       "shape": "[4096,128]",
+       "flops": 3670016,
+       "bytes": 4195328,
+       "count": 9,
+       "seconds": 0.00013739561893780607,
+       "faults": 0.0
+      },
+      {
+       "name": "QKV proj",
+       "kind": "matmul",
+       "shape": "[4096,128]@[128,384]",
+       "flops": 404226048,
+       "bytes": 8586752,
+       "count": 4,
+       "seconds": 0.0011189945238086131,
+       "faults": 0.0
+      },
+      {
+       "name": "QK^T",
+       "kind": "attention",
+       "shape": "128x[128,32]@[32,128]",
+       "flops": 136314880,
+       "bytes": 12582912,
+       "count": 4,
+       "seconds": 0.0005470729655187291,
+       "faults": 0.0
+      },
+      {
+       "name": "softmax",
+       "kind": "elementwise",
+       "shape": "[32,4,128,128]",
+       "flops": 10485760,
+       "bytes": 16793600,
+       "count": 4,
+       "seconds": 0.0017600618214308789,
+       "faults": 0.0
+      },
+      {
+       "name": "attn@V",
+       "kind": "attention",
+       "shape": "128x[128,128]@[128,32]",
+       "flops": 134217728,
+       "bytes": 12582912,
+       "count": 4,
+       "seconds": 0.00041981093333409567,
+       "faults": 0.0
+      },
+      {
+       "name": "out proj",
+       "kind": "matmul",
+       "shape": "[4096,128]@[128,128]",
+       "flops": 134742016,
+       "bytes": 4260352,
+       "count": 4,
+       "seconds": 0.0004257915371897619,
+       "faults": 0.0
+      },
+      {
+       "name": "MLP up",
+       "kind": "matmul",
+       "shape": "[4096,128]@[128,512]",
+       "flops": 538968064,
+       "bytes": 10749952,
+       "count": 4,
+       "seconds": 0.0012559542258039132,
+       "faults": 0.0
+      },
+      {
+       "name": "GELU",
+       "kind": "elementwise",
+       "shape": "[4096,512]",
+       "flops": 10485760,
+       "bytes": 16777216,
+       "count": 4,
+       "seconds": 0.00025870124836595043,
+       "faults": 0.0
+      },
+      {
+       "name": "MLP down",
+       "kind": "matmul",
+       "shape": "[4096,512]@[512,128]",
+       "flops": 537395200,
+       "bytes": 10748416,
+       "count": 4,
+       "seconds": 0.0010515202916678845,
+       "faults": 0.0
+      },
+      {
+       "name": "LM head V=96",
+       "kind": "matmul",
+       "shape": "[4096,128]@[128,96]",
+       "flops": 100663296,
+       "bytes": 3719168,
+       "count": 1,
+       "seconds": 0.00019665505980079627,
+       "faults": 0.0
+      },
+      {
+       "name": "cross-ent V=96",
+       "kind": "elementwise",
+       "shape": "[4096,96]",
+       "flops": 1966080,
+       "bytes": 1605632,
+       "count": 1,
+       "seconds": 0.00012912134666673107,
+       "faults": 0.0
+      }
+     ],
+     "step": {
+      "forward": 0.034305685399999675,
+      "forward+backward": 0.10460991299999023,
+      "train step (fwd+bwd+AdamW)": 0.1153427840000063
+     }
+    },
+    "V=2048": {
+     "shape": {
+      "B": 32,
+      "T": 128,
+      "C": 128,
+      "H": 4,
+      "L": 4,
+      "V": 2048
+     },
+     "ops": [
+      {
+       "name": "LayerNorm",
+       "kind": "elementwise",
+       "shape": "[4096,128]",
+       "flops": 3670016,
+       "bytes": 4195328,
+       "count": 9,
+       "seconds": 0.0001204977181817991,
+       "faults": 0.0
+      },
+      {
+       "name": "QKV proj",
+       "kind": "matmul",
+       "shape": "[4096,128]@[128,384]",
+       "flops": 404226048,
+       "bytes": 8586752,
+       "count": 4,
+       "seconds": 0.000897497566037995,
+       "faults": 0.0
+      },
+      {
+       "name": "QK^T",
+       "kind": "attention",
+       "shape": "128x[128,32]@[32,128]",
+       "flops": 136314880,
+       "bytes": 12582912,
+       "count": 4,
+       "seconds": 0.0007442325555559133,
+       "faults": 0.0
+      },
+      {
+       "name": "softmax",
+       "kind": "elementwise",
+       "shape": "[32,4,128,128]",
+       "flops": 10485760,
+       "bytes": 16793600,
+       "count": 4,
+       "seconds": 0.0015333374736853425,
+       "faults": 0.0
+      },
+      {
+       "name": "attn@V",
+       "kind": "attention",
+       "shape": "128x[128,128]@[128,32]",
+       "flops": 134217728,
+       "bytes": 12582912,
+       "count": 4,
+       "seconds": 0.00030696179816534433,
+       "faults": 0.0
+      },
+      {
+       "name": "out proj",
+       "kind": "matmul",
+       "shape": "[4096,128]@[128,128]",
+       "flops": 134742016,
+       "bytes": 4260352,
+       "count": 4,
+       "seconds": 0.0003030613411764909,
+       "faults": 0.0
+      },
+      {
+       "name": "MLP up",
+       "kind": "matmul",
+       "shape": "[4096,128]@[128,512]",
+       "flops": 538968064,
+       "bytes": 10749952,
+       "count": 4,
+       "seconds": 0.0012017055121942776,
+       "faults": 0.0
+      },
+      {
+       "name": "GELU",
+       "kind": "elementwise",
+       "shape": "[4096,512]",
+       "flops": 10485760,
+       "bytes": 16777216,
+       "count": 4,
+       "seconds": 0.00023399979534926473,
+       "faults": 0.0
+      },
+      {
+       "name": "MLP down",
+       "kind": "matmul",
+       "shape": "[4096,512]@[512,128]",
+       "flops": 537395200,
+       "bytes": 10748416,
+       "count": 4,
+       "seconds": 0.0011197379583336442,
+       "faults": 0.0
+      },
+      {
+       "name": "LM head V=2048",
+       "kind": "matmul",
+       "shape": "[4096,128]@[128,2048]",
+       "flops": 2147483648,
+       "bytes": 36700160,
+       "count": 1,
+       "seconds": 0.004400593083336919,
+       "faults": 0.0
+      },
+      {
+       "name": "cross-ent V=2048",
+       "kind": "elementwise",
+       "shape": "[4096,2048]",
+       "flops": 41943040,
+       "bytes": 33587200,
+       "count": 1,
+       "seconds": 0.0018250459599994428,
+       "faults": 0.0
+      }
+     ],
+     "step": {
+      "forward": 0.04195170979999148,
+      "forward+backward": 0.1189783250000005,
+      "train step (fwd+bwd+AdamW)": 0.12719426849997717
+     }
+    },
+    "n_embd=512": {
+     "shape": {
+      "B": 32,
+      "T": 128,
+      "C": 512,
+      "H": 4,
+      "L": 4,
+      "V": 512
+     },
+     "ops": [
+      {
+       "name": "LayerNorm",
+       "kind": "elementwise",
+       "shape": "[4096,512]",
+       "flops": 14680064,
+       "bytes": 16781312,
+       "count": 9,
+       "seconds": 0.0002456041328676585,
+       "faults": 0.0
+      },
+      {
+       "name": "QKV proj",
+       "kind": "matmul",
+       "shape": "[4096,512]@[512,1536]",
+       "flops": 6448742400,
+       "bytes": 36706304,
+       "count": 4,
+       "seconds": 0.011190775999989456,
+       "faults": 0.0
+      },
+      {
+       "name": "QK^T",
+       "kind": "attention",
+       "shape": "128x[128,128]@[128,128]",
+       "flops": 538968064,
+       "bytes": 25165824,
+       "count": 4,
+       "seconds": 0.002352233952381409,
+       "faults": 0.0
+      },
+      {
+       "name": "softmax",
+       "kind": "elementwise",
+       "shape": "[32,4,128,128]",
+       "flops": 10485760,
+       "bytes": 16793600,
+       "count": 4,
+       "seconds": 0.0024340343157913786,
+       "faults": 0.0
+      },
+      {
+       "name": "attn@V",
+       "kind": "attention",
+       "shape": "128x[128,128]@[128,128]",
+       "flops": 536870912,
+       "bytes": 25165824,
+       "count": 4,
+       "seconds": 0.0017906154285713325,
+       "faults": 0.0
+      },
+      {
+       "name": "out proj",
+       "kind": "matmul",
+       "shape": "[4096,512]@[512,512]",
+       "flops": 2149580800,
+       "bytes": 17827840,
+       "count": 4,
+       "seconds": 0.007257405999991663,
+       "faults": 0.0
+      },
+      {
+       "name": "MLP up",
+       "kind": "matmul",
+       "shape": "[4096,512]@[512,2048]",
+       "flops": 8598323200,
+       "bytes": 46145536,
+       "count": 4,
+       "seconds": 0.02803004900005135,
+       "faults": 0.0
+      },
+      {
+       "name": "GELU",
+       "kind": "elementwise",
+       "shape": "[4096,2048]",
+       "flops": 41943040,
+       "bytes": 67108864,
+       "count": 4,
+       "seconds": 0.001174383379309112,
+       "faults": 0.0
+      },
+      {
+       "name": "MLP down",
+       "kind": "matmul",
+       "shape": "[4096,2048]@[2048,512]",
+       "flops": 8592031744,
+       "bytes": 46139392,
+       "count": 4,
+       "seconds": 0.02062424200001563,
+       "faults": 0.0
+      },
+      {
+       "name": "LM head V=512",
+       "kind": "matmul",
+       "shape": "[4096,512]@[512,512]",
+       "flops": 2147483648,
+       "bytes": 17825792,
+       "count": 1,
+       "seconds": 0.003965034833328218,
+       "faults": 0.0
+      },
+      {
+       "name": "cross-ent V=512",
+       "kind": "elementwise",
+       "shape": "[4096,512]",
+       "flops": 10485760,
+       "bytes": 8421376,
+       "count": 1,
+       "seconds": 0.0006104611756756173,
+       "faults": 0.0
+      }
+     ],
+     "step": {
+      "forward": 0.26508678499999405,
+      "forward+backward": 0.8137966130000223,
+      "train step (fwd+bwd+AdamW)": 0.9560873049999827
+     }
+    },
+    "batch=128": {
+     "shape": {
+      "B": 128,
+      "T": 128,
+      "C": 128,
+      "H": 4,
+      "L": 4,
+      "V": 512
+     },
+     "ops": [
+      {
+       "name": "LayerNorm",
+       "kind": "elementwise",
+       "shape": "[16384,128]",
+       "flops": 14680064,
+       "bytes": 16778240,
+       "count": 9,
+       "seconds": 0.0004290504852937883,
+       "faults": 0.0
+      },
+      {
+       "name": "QKV proj",
+       "kind": "matmul",
+       "shape": "[16384,128]@[128,384]",
+       "flops": 1616904192,
+       "bytes": 33752576,
+       "count": 4,
+       "seconds": 0.004063654099991254,
+       "faults": 0.0
+      },
+      {
+       "name": "QK^T",
+       "kind": "attention",
+       "shape": "512x[128,32]@[32,128]",
+       "flops": 545259520,
+       "bytes": 50331648,
+       "count": 4,
+       "seconds": 0.0026848027142867587,
+       "faults": 0.0
+      },
+      {
+       "name": "softmax",
+       "kind": "elementwise",
+       "shape": "[128,4,128,128]",
+       "flops": 41943040,
+       "bytes": 67125248,
+       "count": 4,
+       "seconds": 0.006348020499999052,
+       "faults": 0.0
+      },
+      {
+       "name": "attn@V",
+       "kind": "attention",
+       "shape": "512x[128,128]@[128,32]",
+       "flops": 536870912,
+       "bytes": 50331648,
+       "count": 4,
+       "seconds": 0.001303558722219754,
+       "faults": 0.0
+      },
+      {
+       "name": "out proj",
+       "kind": "matmul",
+       "shape": "[16384,128]@[128,128]",
+       "flops": 538968064,
+       "bytes": 16843264,
+       "count": 4,
+       "seconds": 0.001381090233329966,
+       "faults": 0.0
+      },
+      {
+       "name": "MLP up",
+       "kind": "matmul",
+       "shape": "[16384,128]@[128,512]",
+       "flops": 2155872256,
+       "bytes": 42207232,
+       "count": 4,
+       "seconds": 0.004883893499993519,
+       "faults": 0.05
+      },
+      {
+       "name": "GELU",
+       "kind": "elementwise",
+       "shape": "[16384,512]",
+       "flops": 41943040,
+       "bytes": 67108864,
+       "count": 4,
+       "seconds": 0.0011612222999985988,
+       "faults": 0.0
+      },
+      {
+       "name": "MLP down",
+       "kind": "matmul",
+       "shape": "[16384,512]@[512,128]",
+       "flops": 2149580800,
+       "bytes": 42205696,
+       "count": 4,
+       "seconds": 0.004957123499991667,
+       "faults": 0.0
+      },
+      {
+       "name": "LM head V=512",
+       "kind": "matmul",
+       "shape": "[16384,128]@[128,512]",
+       "flops": 2147483648,
+       "bytes": 42205184,
+       "count": 1,
+       "seconds": 0.004147531200010235,
+       "faults": 0.0
+      },
+      {
+       "name": "cross-ent V=512",
+       "kind": "elementwise",
+       "shape": "[16384,512]",
+       "flops": 41943040,
+       "bytes": 33685504,
+       "count": 1,
+       "seconds": 0.0022863232500043296,
+       "faults": 0.0
+      }
+     ],
+     "step": {
+      "forward": 0.14881479600001057,
+      "forward+backward": 0.42030928400004086,
+      "train step (fwd+bwd+AdamW)": 0.46894010000005437
+     }
+    }
+   }
+  },
+  "fresh": {
+   "regime": "fresh",
+   "env": {
+    "MALLOC_MMAP_THRESHOLD_": "131072",
+    "MALLOC_TRIM_THRESHOLD_": null,
+    "MALLOC_TOP_PAD_": null
+   },
+   "scenarios": {
+    "base": {
+     "shape": {
+      "B": 32,
+      "T": 128,
+      "C": 128,
+      "H": 4,
+      "L": 4,
+      "V": 512
+     },
+     "ops": [
+      {
+       "name": "LayerNorm",
+       "kind": "elementwise",
+       "shape": "[4096,128]",
+       "flops": 3670016,
+       "bytes": 4195328,
+       "count": 9,
+       "seconds": 0.00048440879452113695,
+       "faults": 513.0
+      },
+      {
+       "name": "QKV proj",
+       "kind": "matmul",
+       "shape": "[4096,128]@[128,384]",
+       "flops": 404226048,
+       "bytes": 8586752,
+       "count": 4,
+       "seconds": 0.001961024846152143,
+       "faults": 1537.0
+      },
+      {
+       "name": "QK^T",
+       "kind": "attention",
+       "shape": "128x[128,32]@[32,128]",
+       "flops": 136314880,
+       "bytes": 12582912,
+       "count": 4,
+       "seconds": 0.0035968679230791167,
+       "faults": 4098.0
+      },
+      {
+       "name": "softmax",
+       "kind": "elementwise",
+       "shape": "[32,4,128,128]",
+       "flops": 10485760,
+       "bytes": 16793600,
+       "count": 4,
+       "seconds": 0.004810384916661785,
+       "faults": 4098.0
+      },
+      {
+       "name": "attn@V",
+       "kind": "attention",
+       "shape": "128x[128,128]@[128,32]",
+       "flops": 134217728,
+       "bytes": 12582912,
+       "count": 4,
+       "seconds": 0.0006852851200005716,
+       "faults": 513.0
+      },
+      {
+       "name": "out proj",
+       "kind": "matmul",
+       "shape": "[4096,128]@[128,128]",
+       "flops": 134742016,
+       "bytes": 4260352,
+       "count": 4,
+       "seconds": 0.00075817926865647,
+       "faults": 513.0
+      },
+      {
+       "name": "MLP up",
+       "kind": "matmul",
+       "shape": "[4096,128]@[128,512]",
+       "flops": 538968064,
+       "bytes": 10749952,
+       "count": 4,
+       "seconds": 0.003402234571426886,
+       "faults": 2049.0
+      },
+      {
+       "name": "GELU",
+       "kind": "elementwise",
+       "shape": "[4096,512]",
+       "flops": 10485760,
+       "bytes": 16777216,
+       "count": 4,
+       "seconds": 0.0017210142692297618,
+       "faults": 2049.0
+      },
+      {
+       "name": "MLP down",
+       "kind": "matmul",
+       "shape": "[4096,512]@[512,128]",
+       "flops": 537395200,
+       "bytes": 10748416,
+       "count": 4,
+       "seconds": 0.0017205948333298693,
+       "faults": 513.0
+      },
+      {
+       "name": "LM head V=512",
+       "kind": "matmul",
+       "shape": "[4096,128]@[128,512]",
+       "flops": 536870912,
+       "bytes": 10747904,
+       "count": 1,
+       "seconds": 0.0028603231666642793,
+       "faults": 2049.0
+      },
+      {
+       "name": "cross-ent V=512",
+       "kind": "elementwise",
+       "shape": "[4096,512]",
+       "flops": 10485760,
+       "bytes": 8421376,
+       "count": 1,
+       "seconds": 0.00183919835000097,
+       "faults": 2049.0
+      }
+     ],
+     "step": {
+      "forward": 0.08928278833332115,
+      "forward+backward": 0.21450591299992539,
+      "train step (fwd+bwd+AdamW)": 0.22142359199995099
+     }
+    },
+    "V=96": {
+     "shape": {
+      "B": 32,
+      "T": 128,
+      "C": 128,
+      "H": 4,
+      "L": 4,
+      "V": 96
+     },
+     "ops": [
+      {
+       "name": "LayerNorm",
+       "kind": "elementwise",
+       "shape": "[4096,128]",
+       "flops": 3670016,
+       "bytes": 4195328,
+       "count": 9,
+       "seconds": 0.0004932775096149883,
+       "faults": 513.0
+      },
+      {
+       "name": "QKV proj",
+       "kind": "matmul",
+       "shape": "[4096,128]@[128,384]",
+       "flops": 404226048,
+       "bytes": 8586752,
+       "count": 4,
+       "seconds": 0.0019723373478259614,
+       "faults": 1537.0
+      },
+      {
+       "name": "QK^T",
+       "kind": "attention",
+       "shape": "128x[128,32]@[32,128]",
+       "flops": 136314880,
+       "bytes": 12582912,
+       "count": 4,
+       "seconds": 0.0032093870769271094,
+       "faults": 4098.0
+      },
+      {
+       "name": "softmax",
+       "kind": "elementwise",
+       "shape": "[32,4,128,128]",
+       "flops": 10485760,
+       "bytes": 16793600,
+       "count": 4,
+       "seconds": 0.003736229999996491,
+       "faults": 4098.0
+      },
+      {
+       "name": "attn@V",
+       "kind": "attention",
+       "shape": "128x[128,128]@[128,32]",
+       "flops": 134217728,
+       "bytes": 12582912,
+       "count": 4,
+       "seconds": 0.0008824829245282191,
+       "faults": 513.0
+      },
+      {
+       "name": "out proj",
+       "kind": "matmul",
+       "shape": "[4096,128]@[128,128]",
+       "flops": 134742016,
+       "bytes": 4260352,
+       "count": 4,
+       "seconds": 0.0007443098548378657,
+       "faults": 513.0
+      },
+      {
+       "name": "MLP up",
+       "kind": "matmul",
+       "shape": "[4096,128]@[128,512]",
+       "flops": 538968064,
+       "bytes": 10749952,
+       "count": 4,
+       "seconds": 0.002705733000002258,
+       "faults": 2049.0
+      },
+      {
+       "name": "GELU",
+       "kind": "elementwise",
+       "shape": "[4096,512]",
+       "flops": 10485760,
+       "bytes": 16777216,
+       "count": 4,
+       "seconds": 0.001762435733333708,
+       "faults": 2049.0
+      },
+      {
+       "name": "MLP down",
+       "kind": "matmul",
+       "shape": "[4096,512]@[512,128]",
+       "flops": 537395200,
+       "bytes": 10748416,
+       "count": 4,
+       "seconds": 0.0018664300344833715,
+       "faults": 513.05
+      },
+      {
+       "name": "LM head V=96",
+       "kind": "matmul",
+       "shape": "[4096,128]@[128,96]",
+       "flops": 100663296,
+       "bytes": 3719168,
+       "count": 1,
+       "seconds": 0.0006019334494383431,
+       "faults": 385.0
+      },
+      {
+       "name": "cross-ent V=96",
+       "kind": "elementwise",
+       "shape": "[4096,96]",
+       "flops": 1966080,
+       "bytes": 1605632,
+       "count": 1,
+       "seconds": 0.00038553491608374975,
+       "faults": 385.0
+      }
+     ],
+     "step": {
+      "forward": 0.09515554149999161,
+      "forward+backward": 0.23636171900000136,
+      "train step (fwd+bwd+AdamW)": 0.21353610400001344
+     }
+    },
+    "V=2048": {
+     "shape": {
+      "B": 32,
+      "T": 128,
+      "C": 128,
+      "H": 4,
+      "L": 4,
+      "V": 2048
+     },
+     "ops": [
+      {
+       "name": "LayerNorm",
+       "kind": "elementwise",
+       "shape": "[4096,128]",
+       "flops": 3670016,
+       "bytes": 4195328,
+       "count": 9,
+       "seconds": 0.00046024862962949726,
+       "faults": 513.0
+      },
+      {
+       "name": "QKV proj",
+       "kind": "matmul",
+       "shape": "[4096,128]@[128,384]",
+       "flops": 404226048,
+       "bytes": 8586752,
+       "count": 4,
+       "seconds": 0.001860412392854219,
+       "faults": 1537.0
+      },
+      {
+       "name": "QK^T",
+       "kind": "attention",
+       "shape": "128x[128,32]@[32,128]",
+       "flops": 136314880,
+       "bytes": 12582912,
+       "count": 4,
+       "seconds": 0.0034357658888792583,
+       "faults": 4098.0
+      },
+      {
+       "name": "softmax",
+       "kind": "elementwise",
+       "shape": "[32,4,128,128]",
+       "flops": 10485760,
+       "bytes": 16793600,
+       "count": 4,
+       "seconds": 0.005108225545458564,
+       "faults": 4098.0
+      },
+      {
+       "name": "attn@V",
+       "kind": "attention",
+       "shape": "128x[128,128]@[128,32]",
+       "flops": 134217728,
+       "bytes": 12582912,
+       "count": 4,
+       "seconds": 0.0007914603124987707,
+       "faults": 513.0
+      },
+      {
+       "name": "out proj",
+       "kind": "matmul",
+       "shape": "[4096,128]@[128,128]",
+       "flops": 134742016,
+       "bytes": 4260352,
+       "count": 4,
+       "seconds": 0.0007566140447762785,
+       "faults": 513.0
+      },
+      {
+       "name": "MLP up",
+       "kind": "matmul",
+       "shape": "[4096,128]@[128,512]",
+       "flops": 538968064,
+       "bytes": 10749952,
+       "count": 4,
+       "seconds": 0.0028621404999979757,
+       "faults": 2049.0
+      },
+      {
+       "name": "GELU",
+       "kind": "elementwise",
+       "shape": "[4096,512]",
+       "flops": 10485760,
+       "bytes": 16777216,
+       "count": 4,
+       "seconds": 0.0016621585999973831,
+       "faults": 2049.0
+      },
+      {
+       "name": "MLP down",
+       "kind": "matmul",
+       "shape": "[4096,512]@[512,128]",
+       "flops": 537395200,
+       "bytes": 10748416,
+       "count": 4,
+       "seconds": 0.0014716150000002458,
+       "faults": 513.0
+      },
+      {
+       "name": "LM head V=2048",
+       "kind": "matmul",
+       "shape": "[4096,128]@[128,2048]",
+       "flops": 2147483648,
+       "bytes": 36700160,
+       "count": 1,
+       "seconds": 0.01039477239999087,
+       "faults": 8193.0
+      },
+      {
+       "name": "cross-ent V=2048",
+       "kind": "elementwise",
+       "shape": "[4096,2048]",
+       "flops": 41943040,
+       "bytes": 33587200,
+       "count": 1,
+       "seconds": 0.009447843166678163,
+       "faults": 8193.0
+      }
+     ],
+     "step": {
+      "forward": 0.10765904649997537,
+      "forward+backward": 0.25218056699998215,
+      "train step (fwd+bwd+AdamW)": 0.2859643980000328
+     }
+    },
+    "n_embd=512": {
+     "shape": {
+      "B": 32,
+      "T": 128,
+      "C": 512,
+      "H": 4,
+      "L": 4,
+      "V": 512
+     },
+     "ops": [
+      {
+       "name": "LayerNorm",
+       "kind": "elementwise",
+       "shape": "[4096,512]",
+       "flops": 14680064,
+       "bytes": 16781312,
+       "count": 9,
+       "seconds": 0.0016752723928569985,
+       "faults": 2049.0
+      },
+      {
+       "name": "QKV proj",
+       "kind": "matmul",
+       "shape": "[4096,512]@[512,1536]",
+       "flops": 6448742400,
+       "bytes": 36706304,
+       "count": 4,
+       "seconds": 0.017427281000010453,
+       "faults": 6145.0
+      },
+      {
+       "name": "QK^T",
+       "kind": "attention",
+       "shape": "128x[128,128]@[128,128]",
+       "flops": 538968064,
+       "bytes": 25165824,
+       "count": 4,
+       "seconds": 0.004602710545451704,
+       "faults": 4098.05
+      },
+      {
+       "name": "softmax",
+       "kind": "elementwise",
+       "shape": "[32,4,128,128]",
+       "flops": 10485760,
+       "bytes": 16793600,
+       "count": 4,
+       "seconds": 0.004609725499998755,
+       "faults": 4098.0
+      },
+      {
+       "name": "attn@V",
+       "kind": "attention",
+       "shape": "128x[128,128]@[128,128]",
+       "flops": 536870912,
+       "bytes": 25165824,
+       "count": 4,
+       "seconds": 0.002643415600005028,
+       "faults": 2049.0
+      },
+      {
+       "name": "out proj",
+       "kind": "matmul",
+       "shape": "[4096,512]@[512,512]",
+       "flops": 2149580800,
+       "bytes": 17827840,
+       "count": 4,
+       "seconds": 0.005689876250002612,
+       "faults": 2049.0
+      },
+      {
+       "name": "MLP up",
+       "kind": "matmul",
+       "shape": "[4096,512]@[512,2048]",
+       "flops": 8598323200,
+       "bytes": 46145536,
+       "count": 4,
+       "seconds": 0.024846888500007935,
+       "faults": 8193.0
+      },
+      {
+       "name": "GELU",
+       "kind": "elementwise",
+       "shape": "[4096,2048]",
+       "flops": 41943040,
+       "bytes": 67108864,
+       "count": 4,
+       "seconds": 0.008235725666679627,
+       "faults": 8193.0
+      },
+      {
+       "name": "MLP down",
+       "kind": "matmul",
+       "shape": "[4096,2048]@[2048,512]",
+       "flops": 8592031744,
+       "bytes": 46139392,
+       "count": 4,
+       "seconds": 0.020727915000009034,
+       "faults": 2049.0
+      },
+      {
+       "name": "LM head V=512",
+       "kind": "matmul",
+       "shape": "[4096,512]@[512,512]",
+       "flops": 2147483648,
+       "bytes": 17825792,
+       "count": 1,
+       "seconds": 0.0059342584444392645,
+       "faults": 2049.0
+      },
+      {
+       "name": "cross-ent V=512",
+       "kind": "elementwise",
+       "shape": "[4096,512]",
+       "flops": 10485760,
+       "bytes": 8421376,
+       "count": 1,
+       "seconds": 0.0016951560370359773,
+       "faults": 2049.0
+      }
+     ],
+     "step": {
+      "forward": 0.4248211019998962,
+      "forward+backward": 1.1334427209999376,
+      "train step (fwd+bwd+AdamW)": 1.1656492419999722
+     }
+    },
+    "batch=128": {
+     "shape": {
+      "B": 128,
+      "T": 128,
+      "C": 128,
+      "H": 4,
+      "L": 4,
+      "V": 512
+     },
+     "ops": [
+      {
+       "name": "LayerNorm",
+       "kind": "elementwise",
+       "shape": "[16384,128]",
+       "flops": 14680064,
+       "bytes": 16778240,
+       "count": 9,
+       "seconds": 0.0017695196000014827,
+       "faults": 2049.0
+      },
+      {
+       "name": "QKV proj",
+       "kind": "matmul",
+       "shape": "[16384,128]@[128,384]",
+       "flops": 1616904192,
+       "bytes": 33752576,
+       "count": 4,
+       "seconds": 0.00873454900001239,
+       "faults": 6145.0
+      },
+      {
+       "name": "QK^T",
+       "kind": "attention",
+       "shape": "512x[128,32]@[32,128]",
+       "flops": 545259520,
+       "bytes": 50331648,
+       "count": 4,
+       "seconds": 0.014848213000021815,
+       "faults": 16386.0
+      },
+      {
+       "name": "softmax",
+       "kind": "elementwise",
+       "shape": "[128,4,128,128]",
+       "flops": 41943040,
+       "bytes": 67125248,
+       "count": 4,
+       "seconds": 0.01678737599998688,
+       "faults": 16386.0
+      },
+      {
+       "name": "attn@V",
+       "kind": "attention",
+       "shape": "512x[128,128]@[128,32]",
+       "flops": 536870912,
+       "bytes": 50331648,
+       "count": 4,
+       "seconds": 0.0026183018571422118,
+       "faults": 2049.0
+      },
+      {
+       "name": "out proj",
+       "kind": "matmul",
+       "shape": "[16384,128]@[128,128]",
+       "flops": 538968064,
+       "bytes": 16843264,
+       "count": 4,
+       "seconds": 0.00245386570588166,
+       "faults": 2049.0
+      },
+      {
+       "name": "MLP up",
+       "kind": "matmul",
+       "shape": "[16384,128]@[128,512]",
+       "flops": 2155872256,
+       "bytes": 42207232,
+       "count": 4,
+       "seconds": 0.009809858166666649,
+       "faults": 8193.0
+      },
+      {
+       "name": "GELU",
+       "kind": "elementwise",
+       "shape": "[16384,512]",
+       "flops": 41943040,
+       "bytes": 67108864,
+       "count": 4,
+       "seconds": 0.006977304125001638,
+       "faults": 8193.0
+      },
+      {
+       "name": "MLP down",
+       "kind": "matmul",
+       "shape": "[16384,512]@[512,128]",
+       "flops": 2149580800,
+       "bytes": 42205696,
+       "count": 4,
+       "seconds": 0.005653773000005913,
+       "faults": 2049.0
+      },
+      {
+       "name": "LM head V=512",
+       "kind": "matmul",
+       "shape": "[16384,128]@[128,512]",
+       "flops": 2147483648,
+       "bytes": 42205184,
+       "count": 1,
+       "seconds": 0.010104931833325281,
+       "faults": 8193.0
+      },
+      {
+       "name": "cross-ent V=512",
+       "kind": "elementwise",
+       "shape": "[16384,512]",
+       "flops": 41943040,
+       "bytes": 33685504,
+       "count": 1,
+       "seconds": 0.007767097666677121,
+       "faults": 8193.0
+      }
+     ],
+     "step": {
+      "forward": 0.36400594199994885,
+      "forward+backward": 0.8979320270000244,
+      "train step (fwd+bwd+AdamW)": 0.8317235600000004
+     }
+    }
+   }
+  },
+  "default": {
+   "regime": "default",
+   "env": {
+    "MALLOC_MMAP_THRESHOLD_": null,
+    "MALLOC_TRIM_THRESHOLD_": null,
+    "MALLOC_TOP_PAD_": null
+   },
+   "scenarios": {
+    "base": {
+     "shape": {
+      "B": 32,
+      "T": 128,
+      "C": 128,
+      "H": 4,
+      "L": 4,
+      "V": 512
+     },
+     "step": {
+      "forward": 0.05397908879999704,
+      "forward+backward": 0.11337207350004519,
+      "train step (fwd+bwd+AdamW)": 0.1289478584999415
+     }
+    },
+    "V=96": {
+     "shape": {
+      "B": 32,
+      "T": 128,
+      "C": 128,
+      "H": 4,
+      "L": 4,
+      "V": 96
+     },
+     "step": {
+      "forward": 0.04994986060000883,
+      "forward+backward": 0.10367652266669818,
+      "train step (fwd+bwd+AdamW)": 0.11274870400006876
+     }
+    },
+    "V=2048": {
+     "shape": {
+      "B": 32,
+      "T": 128,
+      "C": 128,
+      "H": 4,
+      "L": 4,
+      "V": 2048
+     },
+     "step": {
+      "forward": 0.06466459799995998,
+      "forward+backward": 0.14967345200000182,
+      "train step (fwd+bwd+AdamW)": 0.18608396100000846
+     }
+    },
+    "n_embd=512": {
+     "shape": {
+      "B": 32,
+      "T": 128,
+      "C": 512,
+      "H": 4,
+      "L": 4,
+      "V": 512
+     },
+     "step": {
+      "forward": 0.34613124399993467,
+      "forward+backward": 0.9649242170000889,
+      "train step (fwd+bwd+AdamW)": 1.002337918999956
+     }
+    },
+    "batch=128": {
+     "shape": {
+      "B": 128,
+      "T": 128,
+      "C": 128,
+      "H": 4,
+      "L": 4,
+      "V": 512
+     },
+     "step": {
+      "forward": 0.3084397519999129,
+      "forward+backward": 0.6034092630000032,
+      "train step (fwd+bwd+AdamW)": 0.6317912790000264
+     }
+    }
+   }
+  }
+ }
+}
