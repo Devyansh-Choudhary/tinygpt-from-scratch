@@ -182,7 +182,7 @@ cache roof ("memory roof" column; the DRAM-roof percentage is kept for compariso
    about a quarter of the char → bpe2048 gain (0.083 of 0.307 BPC) comes from seeing more characters of context at
    the same 128-token cost. The bpe2048 model also has 30% more (embedding) parameters, which this experiment
    cannot separate from the tokenizer.
-3. **Removing position embeddings costs ~0.10 BPC (1.015 → 1.113), but it doesn't break the model.**
+3. **Removing position embeddings costs ~0.10 BPC (1.011 → 1.115), but it doesn't break the model.**
    bpe512_nopos is still far better than char. This is *less* damage than one might expect from removing all
    explicit order information. The likely reason is that the causal mask leaks position: a token can count or
    anchor on what came before it, which is the known "NoPos" effect. The newline-anchor head above is consistent with that.
