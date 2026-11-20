@@ -1,0 +1,53 @@
+{
+  "run_name": "bpe512_nopos_s1338",
+  "tokenizer": "bpe512",
+  "vocab_size": 512,
+  "use_pos_emb": false,
+  "final_val_bpc": 1.1402910730615101,
+  "final_val_bpc_log_slice": 1.168028680991346,
+  "log_slice_chars": 50000,
+  "seed": 1338,
+  "final_val_loss": 1.8752897799015045,
+  "final_train_loss": 1.7400503795880538,
+  "steps": 3849,
+  "train_time_s": 420.0160927500028,
+  "time_budget_s": 420.0,
+  "wall_time_s": 433.3290449829997,
+  "steps_per_sec": 9.163934588313401,
+  "tokens_per_sec": 37535.47607373169,
+  "tokenize_time_s": 0.009828184000070905,
+  "n_train_tokens": 1973864,
+  "n_val_tokens": 104567,
+  "chars_per_token_val": 2.3713821600920095,
+  "num_params_non_embedding": 793344,
+  "num_params_total": 858880,
+  "checkpoint": "(not committed: seed-variance check only)",
+  "hparams": {
+    "batch_size": 32,
+    "block_size": 128,
+    "n_layer": 4,
+    "n_head": 4,
+    "n_embd": 128,
+    "dropout": 0.0,
+    "lr": 0.003,
+    "betas": [
+      0.9,
+      0.95
+    ],
+    "weight_decay": 0.1,
+    "grad_clip": 1.0,
+    "warmup_frac": 0.05,
+    "min_lr_frac": 0.1,
+    "eval_interval_s": 30,
+    "eval_iters": 20,
+    "eval_max_chars_during_training": 50000,
+    "sample_prompt": "Once upon a time",
+    "sample_tokens": 200,
+    "sample_temperature": 0.8,
+    "sample_top_k": null,
+    "sample_fracs": [
+      0.25,
+      0.5
+    ]
+  }
+}

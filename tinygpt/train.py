@@ -18,6 +18,9 @@ Fairness rules implemented here:
     decay to ``min_lr_frac * lr``), so every run completes its whole schedule in exactly the budget,
     however fast or slow its steps are.
   * ``elapsed_s`` in log.csv is training seconds, so curves of different runs share an x-axis.
+  * Every log.csv row (including the last) scores ``val_bpc`` on the SAME validation slice
+    (``eval_max_chars_during_training`` chars), so a curve never jumps because the eval text changed.
+    The headline ``final_val_bpc`` (checkpoint + summary.json) uses ``FINAL_EVAL_MAX_CHARS``.
 """
 
 from __future__ import annotations
@@ -173,7 +176,7 @@ def run_training(run_name: str, tokenizer_kind: str, time_budget_min: float = 7.
                  max_steps: int | None = None, text: str | None = None, results_dir: str = "results",
                  checkpoint_dir: str = "checkpoints", tokenizer_dir: str = TOKENIZER_DIR,
                  config_path: str = "configs/default.json", cache_dir: str | None = ".cache/tokens",
-                 verbose: bool = True) -> dict:
+                 verbose: bool = True, seed: int = SEED) -> dict:
     """Train one run within a wall-clock budget of TRAINING time (eval/sampling/tokenizing excluded).
 
     Args:
@@ -182,6 +185,8 @@ def run_training(run_name: str, tokenizer_kind: str, time_budget_min: float = 7.
             ``max(train_time / budget, step / max_steps)`` so the schedule still completes.
         cache_dir: where encoded token arrays are cached (``None`` disables caching).
         verbose: print progress.
+        seed: seeds model init, the training batch stream and sampling (default 1337, as in SPEC).
+            The evaluation windows always use ``SEED + 1`` so every seed is scored on the same windows.
 
     Returns:
         dict with ``final_val_bpc`` (float, max_chars=200000), ``steps`` (int) and timing info
@@ -191,9 +196,9 @@ def run_training(run_name: str, tokenizer_kind: str, time_budget_min: float = 7.
         raise ValueError(f"tokenizer must be one of {TOKENIZER_KINDS}, got {tokenizer_kind!r}")
     log = print if verbose else (lambda *a, **k: None)
     hp = load_hparams(config_path)
-    random.seed(SEED)
-    np.random.seed(SEED)
-    torch.manual_seed(SEED)
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
     torch.set_num_threads(NUM_THREADS)
     bs, T = hp["batch_size"], hp["block_size"]
     budget_s = time_budget_min * 60.0
@@ -217,7 +222,7 @@ def run_training(run_name: str, tokenizer_kind: str, time_budget_min: float = 7.
         raise ValueError("corpus too small for block_size")
 
     # ---- model + optimizer ------------------------------------------------------------------------
-    torch.manual_seed(SEED)
+    torch.manual_seed(seed)
     cfg = GPTConfig(vocab_size=tokenizer.vocab_size, block_size=T, n_layer=hp["n_layer"], n_head=hp["n_head"],
                     n_embd=hp["n_embd"], dropout=hp["dropout"], use_pos_emb=use_pos_emb)
     model = GPT(cfg)
@@ -232,7 +237,7 @@ def run_training(run_name: str, tokenizer_kind: str, time_budget_min: float = 7.
     n_eval = hp["eval_iters"] * bs
     val_offsets = torch.randint(len(val_data) - T - 1, (n_eval,), generator=g_eval)
     train_offsets = torch.randint(len(train_data) - T - 1, (n_eval,), generator=g_eval)
-    g_train = torch.Generator().manual_seed(SEED)
+    g_train = torch.Generator().manual_seed(seed)
 
     run_dir = os.path.join(results_dir, run_name)
     os.makedirs(run_dir, exist_ok=True)
@@ -248,16 +253,16 @@ def run_training(run_name: str, tokenizer_kind: str, time_budget_min: float = 7.
             f = max(f, step / max_steps)
         return f
 
-    def write_row(step, train_time, train_loss, final=False):
+    def write_row(step, train_time, train_loss):
+        # Same eval slice for every row (incl. the last) so the logged curve is self-consistent.
         val_loss = estimate_loss(model, val_data, val_offsets, bs, T)
-        max_chars = FINAL_EVAL_MAX_CHARS if final else hp["eval_max_chars_during_training"]
-        val_bpc = bits_per_char(model, tokenizer, val_text, T, max_chars=max_chars)
+        val_bpc = bits_per_char(model, tokenizer, val_text, T, max_chars=hp["eval_max_chars_during_training"])
         writer.writerow([step, f"{train_time:.2f}", f"{train_loss:.5f}", f"{val_loss:.5f}", f"{val_bpc:.5f}"])
         log_f.flush()
         return val_loss, val_bpc
 
     def write_sample(step, train_time):
-        s = sample_text(model, tokenizer, hp, seed=SEED + step)
+        s = sample_text(model, tokenizer, hp, seed=seed + step)
         samples_f.write(f"=== step {step} (elapsed {train_time:.1f}s) ===\n{s}\n\n")
         samples_f.flush()
 
@@ -312,7 +317,8 @@ def run_training(run_name: str, tokenizer_kind: str, time_budget_min: float = 7.
 
     # ---- final eval, sample, checkpoint -------------------------------------------------------------
     tl = float(np.mean(recent_losses)) if recent_losses else train_loss0
-    final_val_loss, final_val_bpc = write_row(step, train_time, tl, final=True)
+    final_val_loss, final_val_bpc_log_slice = write_row(step, train_time, tl)
+    final_val_bpc = bits_per_char(model, tokenizer, val_text, T, max_chars=FINAL_EVAL_MAX_CHARS)
     write_sample(step, train_time)
     log_f.close()
     samples_f.close()
@@ -330,6 +336,9 @@ def run_training(run_name: str, tokenizer_kind: str, time_budget_min: float = 7.
         "vocab_size": tokenizer.vocab_size,
         "use_pos_emb": use_pos_emb,
         "final_val_bpc": float(final_val_bpc),
+        "final_val_bpc_log_slice": float(final_val_bpc_log_slice),
+        "log_slice_chars": int(min(hp["eval_max_chars_during_training"], len(val_text))),
+        "seed": seed,
         "final_val_loss": float(final_val_loss),
         "final_train_loss": tl,
         "steps": step,
@@ -369,6 +378,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
                    help="per-run JSON (configs/<run>.json) with run_name/tokenizer/use_pos_emb/time_budget_min; "
                         "explicit flags override it")
     p.add_argument("--max_steps", type=int, default=None, help="optional hard cap on optimizer steps")
+    p.add_argument("--seed", type=int, default=SEED, help=f"init/batch/sampling seed (default {SEED})")
     p.add_argument("--results_dir", default="results")
     p.add_argument("--checkpoint_dir", default="checkpoints")
     p.add_argument("--tokenizer_dir", default=TOKENIZER_DIR)
@@ -398,7 +408,7 @@ def main(argv: list[str] | None = None) -> None:
     config_path = args.config or run_cfg.get("config", "configs/default.json")
     run_training(run_name, tokenizer, time_budget_min=budget, use_pos_emb=use_pos_emb, max_steps=args.max_steps,
                  results_dir=args.results_dir, checkpoint_dir=args.checkpoint_dir,
-                 tokenizer_dir=args.tokenizer_dir, config_path=config_path)
+                 tokenizer_dir=args.tokenizer_dir, config_path=config_path, seed=args.seed)
 
 
 if __name__ == "__main__":

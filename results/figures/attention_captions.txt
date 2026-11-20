@@ -1,4 +1,4 @@
-bpe2048: Layer 2, head 1 — focused head: sharp, content-dependent attention (mean entropy 1.65 bits); e.g. '␣a' looks at '␣a' (98%, 0 back).
-bpe512: Layer 3, head 2 — focused head: sharp, content-dependent attention (mean entropy 1.67 bits); e.g. '.' looks at 'he' (99%, 8 back).
-bpe512_nopos: Layer 1, head 0 — focused head: sharp, content-dependent attention (mean entropy 1.17 bits); e.g. '↵' looks at '↵' (98%, 0 back).
-char: Layer 1, head 0 — focused head: sharp, content-dependent attention (mean entropy 1.07 bits); e.g. 'n' looks at 'u' (100%, 3 back).
+bpe2048: Layer 3, head 1 — focused head: sharp, content-dependent attention (mean entropy 1.83 bits); e.g. '␣loved' looks at '␣loved' (95%, 0 back).
+bpe512: Layer 3, head 3 — diffuse head: spreads attention broadly over the context (mean entropy 2.30 bits), like a running average.
+bpe512_nopos: Layer 3, head 2 — focused head: sharp, content-dependent attention (mean entropy 1.62 bits); e.g. '␣a' looks at '␣upon' (90%, 1 back).
+char: Layer 1, head 1 — focused head: sharp, content-dependent attention (mean entropy 1.14 bits); e.g. 'u' looks at '␣' (100%, 1 back).

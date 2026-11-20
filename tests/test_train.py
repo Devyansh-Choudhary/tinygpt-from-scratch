@@ -356,7 +356,8 @@ def test_run_training_outputs_and_checkpoint_roundtrip(tmp_path, fakes):
     assert rows[0] == ["step", "elapsed_s", "train_loss", "val_loss", "val_bpc"]
     assert rows[1][0] == "0" and float(rows[1][1]) == 0.0
     assert rows[-1][0] == "60"
-    assert float(rows[-1][4]) == pytest.approx(out["final_val_bpc"], abs=1e-5)
+    # The last row is scored on the same slice as every other row; the headline number uses 200k chars.
+    assert float(rows[-1][4]) == pytest.approx(out["final_val_bpc_log_slice"], abs=1e-5)
     # learning happened
     assert float(rows[-1][3]) < float(rows[1][3]) - 0.5
     steps = [int(r[0]) for r in rows[1:]]
@@ -399,6 +400,46 @@ def test_run_training_is_deterministic_and_nopos(tmp_path, fakes):
     assert ck["model_config"]["use_pos_emb"] is False
     assert not any(k.startswith("pos_emb") for k in ck["model_state"])
     assert c["final_val_bpc"] != a["final_val_bpc"]
+
+
+def test_every_log_row_uses_the_same_eval_slice(tmp_path, fakes):
+    """Review fix: the final log row used to switch from the 50k-char slice to the 200k-char slice, which
+    put an artificial drop at the end of every BPC curve. All rows must use one slice; the 200k number goes
+    to the checkpoint/summary only."""
+    text = make_text(60000)
+    out = tr.run_training("s", "char", time_budget_min=1.0, max_steps=30, text=text,
+                          results_dir=str(tmp_path / "r"), checkpoint_dir=str(tmp_path / "c"),
+                          tokenizer_dir=str(tmp_path / "tok"), config_path=tiny_config(tmp_path, eval_interval_s=1e9),
+                          cache_dir=None, verbose=False)
+    model, tok, ck = ev.load_checkpoint(str(tmp_path / "c" / "s.pt"))
+    _, val = fake_split_text(text)
+    last = float(read_log(tmp_path / "r" / "s" / "log.csv")[-1][4])
+    on_log_slice = ev.bits_per_char(model, tok, val, 32, max_chars=2000)
+    on_final_slice = ev.bits_per_char(model, tok, val, 32, max_chars=tr.FINAL_EVAL_MAX_CHARS)
+    assert on_log_slice != pytest.approx(on_final_slice, abs=1e-4)  # the two slices really differ here
+    assert last == pytest.approx(on_log_slice, abs=1e-5)
+    assert out["final_val_bpc"] == pytest.approx(on_final_slice, rel=1e-6) == ck["final_val_bpc"]
+    assert out["final_val_bpc_log_slice"] == pytest.approx(last, abs=1e-5) and out["log_slice_chars"] == 2000
+
+
+def test_seed_controls_init_and_batches_but_not_eval_windows(tmp_path, fakes, monkeypatch):
+    """Review fix: a seed knob is needed to measure run-to-run variance. Same seed -> identical run;
+    different seed -> different run, scored on the same eval windows."""
+    seen = []
+    real_estimate = tr.estimate_loss
+    monkeypatch.setattr(tr, "estimate_loss", lambda m, d, off, *a: (seen.append(off.clone()), real_estimate(m, d, off, *a))[1])
+    kw = dict(time_budget_min=1.0, max_steps=15, text=make_text(30000), tokenizer_dir=str(tmp_path / "tok"),
+              config_path=tiny_config(tmp_path, eval_interval_s=1e9), cache_dir=None, verbose=False,
+              results_dir=str(tmp_path / "r"), checkpoint_dir=str(tmp_path / "c"))
+    a = tr.run_training("a", "char", seed=1, **kw)
+    b = tr.run_training("b", "char", seed=1, **kw)
+    c = tr.run_training("c", "char", seed=2, **kw)
+    assert a["final_val_bpc"] == b["final_val_bpc"] != c["final_val_bpc"]
+    assert a["seed"] == 1 and c["seed"] == 2
+    val_offsets = seen[1::3]  # per run: train@0, val@0, val@end
+    assert all(torch.equal(val_offsets[0], v) for v in val_offsets)
+    assert tr.build_arg_parser().parse_args(["--seed", "7"]).seed == 7
+    assert tr.build_arg_parser().parse_args([]).seed == tr.SEED
 
 
 def test_time_budget_counts_training_only(tmp_path, fakes, monkeypatch):
